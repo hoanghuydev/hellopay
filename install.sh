@@ -1,7 +1,7 @@
 #!/bin/sh
 # Script cài hellopay cho macOS / Linux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/hoanghuy-sepay/hellopay/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hoanghuydev/hellopay/main/install.sh | bash
 #
 # Biến môi trường tuỳ chọn:
 #   HELLOPAY_VERSION=v0.1.0   cài đúng phiên bản này (mặc định: bản mới nhất)
@@ -10,7 +10,7 @@
 # Viết bằng POSIX sh (không dùng cú pháp riêng của bash) để chạy được cả với `sh`.
 set -eu
 
-REPO="hoanghuy-sepay/hellopay"
+REPO="hoanghuydev/hellopay"
 BIN="hellopay"
 
 # ─── in ra cho người dùng ────────────────────────────────────────────────────

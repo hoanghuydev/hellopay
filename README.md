@@ -10,25 +10,25 @@ Hướng dẫn từng bước: xem `../HUONG-DAN-PHAT-HANH-CLI.md`.
 macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hoanghuy-sepay/hellopay/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hoanghuydev/hellopay/main/install.sh | bash
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/hoanghuy-sepay/hellopay/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/hoanghuydev/hellopay/main/install.ps1 | iex
 ```
 
 Homebrew:
 
 ```bash
-brew install hoanghuy-sepay/tap/hellopay
+brew install hoanghuydev/hellopay/hellopay
 ```
 
 Scoop:
 
 ```powershell
-scoop bucket add hoanghuy-sepay https://github.com/hoanghuy-sepay/scoop-bucket
+scoop bucket add hoanghuydev https://github.com/hoanghuydev/scoop-bucket-hellopay
 scoop install hellopay
 ```
 

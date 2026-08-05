@@ -1,6 +1,6 @@
 # Script cài hellopay cho Windows.
 #
-#   irm https://raw.githubusercontent.com/hoanghuy-sepay/hellopay/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/hoanghuydev/hellopay/main/install.ps1 | iex
 #
 # Không cần quyền Administrator: mặc định cài vào thư mục của chính người dùng.
 #
@@ -10,7 +10,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$Repo = 'hoanghuy-sepay/hellopay'
+$Repo = 'hoanghuydev/hellopay'
 $Bin  = 'hellopay'
 
 function Write-Info { param($m) Write-Host "==> $m" -ForegroundColor Cyan }

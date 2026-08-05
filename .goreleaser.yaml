@@ -38,7 +38,7 @@ checksum:
 
 release:
   github:
-    owner: hoanghuy-sepay # ĐỔI: user/tổ chức GitHub của bạn
+    owner: hoanghuydev # ĐỔI: user/tổ chức GitHub của bạn
     name: hellopay
   draft: false # để true nếu muốn xem lại trước khi công bố
   # prerelease: auto   # tag có -rc / -beta thì tự đánh dấu là bản thử
@@ -49,41 +49,48 @@ changelog:
     exclude: ["^docs:", "^test:", "^chore:"]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Homebrew (macOS + Linux). Cần repo riêng tên "homebrew-tap" và một token
+# Homebrew (macOS + Linux). Cần repo riêng tên "homebrew-hellopay" và một token
 # có quyền ghi vào repo đó (secret TAP_GITHUB_TOKEN trong Actions).
-# Bỏ comment sau khi đã tạo repo tap.
+# Repo "homebrew-hellopay" → Homebrew bỏ tiền tố "homebrew-" → người dùng gõ:
+#   brew install hoanghuydev/hellopay/hellopay
 # ─────────────────────────────────────────────────────────────────────────────
-# homebrew_casks:
-#   - name: hellopay
-#     repository:
-#       owner: hoanghuy-sepay
-#       name: homebrew-tap
-#       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-#     homepage: https://github.com/hoanghuy-sepay/hellopay
-#     description: CLI giả để tập phát hành
-#     binaries: [hellopay]
-#     url:
-#       verified: "github.com/hoanghuy-sepay/hellopay/"
-#     # Binary chưa được Apple ký/notarize thì macOS sẽ chặn. Hook này xoá cờ
-#     # "tải từ Internet" ngay sau khi cài. Đây là cách chữa cháy, không phải cách đúng
-#     # — cách đúng là ký bằng Developer ID + notarize (xem mục 6 của hướng dẫn).
-#     hooks:
-#       post:
-#         install: |
-#           if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-#             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/hellopay"]
-#           end
+homebrew_casks:
+  - name: hellopay
+    repository:
+      owner: hoanghuydev
+      name: homebrew-hellopay
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    # Thư mục trong repo tap để GoReleaser ghi file .rb vào.
+    # "Casks" là mặc định của homebrew_casks, ghi rõ ra để khỏi phải đoán.
+    directory: Casks
+    homepage: https://github.com/hoanghuydev/hellopay
+    description: CLI giả để tập phát hành
+    binaries: [hellopay]
+    url:
+      verified: "github.com/hoanghuydev/hellopay/"
+    # Binary chưa được Apple ký/notarize thì macOS sẽ chặn. Hook này xoá cờ
+    # "tải từ Internet" ngay sau khi cài. Đây là cách chữa cháy, không phải cách đúng
+    # — cách đúng là ký bằng Developer ID + notarize (xem mục 6 của hướng dẫn).
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/hellopay"]
+          end
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scoop (Windows). Cần repo riêng tên "scoop-bucket".
+# Scoop (Windows). Cần repo riêng tên "scoop-bucket-hellopay".
+# Tên bucket do người dùng tự đặt lúc `scoop bucket add <tên> <url>`.
 # ─────────────────────────────────────────────────────────────────────────────
-# scoops:
-#   - name: hellopay
-#     repository:
-#       owner: hoanghuy-sepay
-#       name: scoop-bucket
-#       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-#     directory: bucket
-#     homepage: https://github.com/hoanghuy-sepay/hellopay
-#     description: CLI giả để tập phát hành
-#     license: MIT
+scoops:
+  - name: hellopay
+    repository:
+      owner: hoanghuydev
+      name: scoop-bucket-hellopay
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    # Thư mục trong repo bucket để GoReleaser ghi file .json vào.
+    # Mặc định là gốc repo; đặt "bucket" cho khớp cấu trúc repo scoop-bucket-hellopay.
+    directory: bucket
+    homepage: https://github.com/hoanghuydev/hellopay
+    description: CLI giả để tập phát hành
+    license: MIT
