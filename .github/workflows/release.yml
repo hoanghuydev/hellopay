@@ -1,0 +1,34 @@
+name: Release
+
+# Chỉ chạy khi có tag dạng v* được đẩy lên. Không tag = không phát hành.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # cần quyền này để tạo GitHub Release và upload file
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser cần toàn bộ history + tag để dựng changelog
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          # Token này GitHub tự cấp, chỉ ghi được vào repo hiện tại.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Token riêng để ghi sang repo homebrew-tap và scoop-bucket.
+          # Tạo ở Settings → Developer settings → Personal access tokens,
+          # rồi thêm vào repo này ở Settings → Secrets → Actions.
+          # Chưa bật Homebrew/Scoop thì dòng này không cần.
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
