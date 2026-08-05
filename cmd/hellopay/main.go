@@ -23,17 +23,17 @@ var (
 	date    = "unknown"
 )
 
-const usage = `hellopay — CLI giả để tập phát hành
+const usage = `hellopay — a fake CLI for practising releases
 
-Cách dùng:
-  hellopay <lệnh> [tham số]
+Usage:
+  hellopay <command> [arguments]
 
-Lệnh:
-  hello [tên]     In lời chào
-  version         In thông tin phiên bản (thêm --json để máy đọc)
-  help            In trợ giúp này
+Commands:
+  hello [name]    Print a greeting
+  version         Show version information (add --json for machine output)
+  help            Show this help
 
-Ví dụ:
+Examples:
   hellopay hello SePay
   hellopay version --json
 `
@@ -51,7 +51,7 @@ func main() {
 		if len(args) > 1 {
 			name = strings.Join(args[1:], " ")
 		}
-		fmt.Printf("Xin chào, %s! (hellopay %s)\n", name, version)
+		fmt.Printf("Hello, %s! (hellopay %s)\n", name, version)
 
 	case "version", "--version", "-v":
 		if len(args) > 1 && args[1] == "--json" {
@@ -72,7 +72,7 @@ func main() {
 		fmt.Print(usage)
 
 	default:
-		fmt.Fprintf(os.Stderr, "hellopay: không biết lệnh %q\n\n", args[0])
+		fmt.Fprintf(os.Stderr, "hellopay: unknown command %q\n\n", args[0])
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(1)
 	}

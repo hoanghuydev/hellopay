@@ -64,7 +64,7 @@ homebrew_casks:
     # "Casks" là mặc định của homebrew_casks, ghi rõ ra để khỏi phải đoán.
     directory: Casks
     homepage: https://github.com/hoanghuydev/hellopay
-    description: CLI giả để tập phát hành
+    description: A fake CLI for practising releases
     binaries: [hellopay]
     url:
       verified: "github.com/hoanghuydev/hellopay/"
@@ -92,5 +92,5 @@ scoops:
     # Mặc định là gốc repo; đặt "bucket" cho khớp cấu trúc repo scoop-bucket.
     directory: bucket
     homepage: https://github.com/hoanghuydev/hellopay
-    description: CLI giả để tập phát hành
+    description: A fake CLI for practising releases
     license: MIT
