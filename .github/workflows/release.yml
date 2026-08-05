@@ -27,7 +27,7 @@ jobs:
         env:
           # Token này GitHub tự cấp, chỉ ghi được vào repo hiện tại.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Token riêng để ghi sang repo homebrew-hellopay và scoop-bucket-hellopay.
+          # Token riêng để ghi sang repo homebrew-tap và scoop-bucket.
           # Tạo ở Settings → Developer settings → Personal access tokens,
           # rồi thêm vào repo này ở Settings → Secrets → Actions.
           # Chưa bật Homebrew/Scoop thì dòng này không cần.

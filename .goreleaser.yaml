@@ -49,16 +49,16 @@ changelog:
     exclude: ["^docs:", "^test:", "^chore:"]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Homebrew (macOS + Linux). Cần repo riêng tên "homebrew-hellopay" và một token
+# Homebrew (macOS + Linux). Cần repo riêng tên "homebrew-tap" và một token
 # có quyền ghi vào repo đó (secret TAP_GITHUB_TOKEN trong Actions).
-# Repo "homebrew-hellopay" → Homebrew bỏ tiền tố "homebrew-" → người dùng gõ:
-#   brew install hoanghuydev/hellopay/hellopay
+# Repo "homebrew-tap" → Homebrew bỏ tiền tố "homebrew-" → người dùng gõ:
+#   brew install hoanghuydev/tap/hellopay
 # ─────────────────────────────────────────────────────────────────────────────
 homebrew_casks:
   - name: hellopay
     repository:
       owner: hoanghuydev
-      name: homebrew-hellopay
+      name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     # Thư mục trong repo tap để GoReleaser ghi file .rb vào.
     # "Casks" là mặc định của homebrew_casks, ghi rõ ra để khỏi phải đoán.
@@ -79,17 +79,17 @@ homebrew_casks:
           end
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scoop (Windows). Cần repo riêng tên "scoop-bucket-hellopay".
+# Scoop (Windows). Cần repo riêng tên "scoop-bucket".
 # Tên bucket do người dùng tự đặt lúc `scoop bucket add <tên> <url>`.
 # ─────────────────────────────────────────────────────────────────────────────
 scoops:
   - name: hellopay
     repository:
       owner: hoanghuydev
-      name: scoop-bucket-hellopay
+      name: scoop-bucket
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     # Thư mục trong repo bucket để GoReleaser ghi file .json vào.
-    # Mặc định là gốc repo; đặt "bucket" cho khớp cấu trúc repo scoop-bucket-hellopay.
+    # Mặc định là gốc repo; đặt "bucket" cho khớp cấu trúc repo scoop-bucket.
     directory: bucket
     homepage: https://github.com/hoanghuydev/hellopay
     description: CLI giả để tập phát hành

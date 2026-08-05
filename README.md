@@ -22,13 +22,13 @@ irm https://raw.githubusercontent.com/hoanghuydev/hellopay/main/install.ps1 | ie
 Homebrew:
 
 ```bash
-brew install hoanghuydev/hellopay/hellopay
+brew install hoanghuydev/tap/hellopay
 ```
 
 Scoop:
 
 ```powershell
-scoop bucket add hoanghuydev https://github.com/hoanghuydev/scoop-bucket-hellopay
+scoop bucket add hoanghuydev https://github.com/hoanghuydev/scoop-bucket
 scoop install hellopay
 ```
 
