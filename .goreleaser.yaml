@@ -14,11 +14,19 @@ builds:
       - CGO_ENABLED=0 # binary tĩnh: chạy được trên mọi distro Linux, không cần thư viện hệ thống
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
+    # Không nhúng đường dẫn thư mục trên máy build vào binary. Thiếu cờ này thì
+    # `strings` trên binary công khai lộ ra cây thư mục của máy dev / runner CI.
+    flags: [-trimpath]
+    # Đóng dấu thời gian theo commit thay vì giờ build, để build lại cùng một
+    # commit ra file y hệt (cùng SHA256). Đó là cách chứng minh binary đến từ
+    # đúng source đó.
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w # bỏ bảng debug cho binary nhỏ hơn
       - -X main.version={{ .Version }}
       - -X main.commit={{ .ShortCommit }}
-      - -X main.date={{ .Date }}
+      # .CommitDate thay vì .Date: .Date là giờ build nên mỗi lần build một khác.
+      - -X main.date={{ .CommitDate }}
 
 archives:
   - id: hellopay
@@ -36,12 +44,31 @@ archives:
 checksum:
   name_template: checksums.txt # 1 file chứa SHA256 của mọi file còn lại
 
+# Ký checksums.txt bằng cosign, không cần khoá riêng — danh tính lấy từ GitHub
+# Actions (OIDC). Ký đúng 1 file này là đủ, vì nó đã chứa mã băm của mọi file khác.
+# install.sh sẽ kiểm chữ ký này nếu máy người dùng có cosign.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
 release:
   github:
     owner: hoanghuydev # ĐỔI: user/tổ chức GitHub của bạn
     name: hellopay
   draft: false # để true nếu muốn xem lại trước khi công bố
-  # prerelease: auto   # tag có -rc / -beta thì tự đánh dấu là bản thử
+  # Tag có -rc / -beta thì tự đánh dấu là bản thử. BẮT BUỘC phải có: thiếu nó thì
+  # GitHub coi bản RC là "latest", và install.sh (đọc /releases/latest) sẽ phát
+  # bản RC cho toàn bộ người dùng.
+  prerelease: auto
 
 changelog:
   sort: asc
@@ -63,6 +90,8 @@ homebrew_casks:
     # Thư mục trong repo tap để GoReleaser ghi file .rb vào.
     # "Casks" là mặc định của homebrew_casks, ghi rõ ra để khỏi phải đoán.
     directory: Casks
+    # Bản prerelease thì không đẩy cask, không thì `brew upgrade` kéo cả RC về.
+    skip_upload: auto
     homepage: https://github.com/hoanghuydev/hellopay
     description: A fake CLI for practising releases
     binaries: [hellopay]
@@ -99,6 +128,7 @@ scoops:
     # Thư mục trong repo bucket để GoReleaser ghi file .json vào.
     # Mặc định là gốc repo; đặt "bucket" cho khớp cấu trúc repo scoop-bucket.
     directory: bucket
+    skip_upload: auto # bản prerelease thì không đẩy manifest
     homepage: https://github.com/hoanghuydev/hellopay
     description: A fake CLI for practising releases
     license: MIT

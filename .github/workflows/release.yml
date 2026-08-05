@@ -7,6 +7,13 @@ on:
 
 permissions:
   contents: write # cần quyền này để tạo GitHub Release và upload file
+  id-token: write # cosign ký không cần khoá, danh tính lấy qua OIDC
+
+# Hai tag đẩy lên sát nhau sẽ tranh nhau ghi vào repo tap/bucket. Xếp hàng thay vì
+# huỷ job cũ: một bản phát hành đang dở mà bị huỷ giữa đường thì tệ hơn là chờ.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   goreleaser:
@@ -19,6 +26,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26"
+
+      - uses: sigstore/cosign-installer@v3
 
       - uses: goreleaser/goreleaser-action@v6
         with:
