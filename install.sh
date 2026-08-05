@@ -19,12 +19,13 @@ say()  { printf '%s\n' "$1"; }
 fail() { printf 'Error: %s\n' "$1" >&2; shift; for l in "$@"; do printf '  %s\n' "$l" >&2; done; exit 1; }
 
 # ─── 1. công cụ cần có ───────────────────────────────────────────────────────
+# Có timeout để một kết nối treo không làm người dùng ngồi chờ vô hạn.
 if command -v curl >/dev/null 2>&1; then
-  dl() { curl -fsSL "$1" -o "$2"; }
-  dl_stdout() { curl -fsSL "$1"; }
+  dl() { curl -fsSL --connect-timeout 10 --max-time 600 "$1" -o "$2"; }
+  dl_stdout() { curl -fsSL --connect-timeout 10 --max-time 60 "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  dl() { wget -qO "$2" "$1"; }
-  dl_stdout() { wget -qO- "$1"; }
+  dl() { wget -q --timeout=10 --tries=3 -O "$2" "$1"; }
+  dl_stdout() { wget -q --timeout=10 --tries=3 -O- "$1"; }
 else
   fail "curl or wget is required but neither is installed."
 fi
@@ -57,18 +58,21 @@ if [ -z "$version" ]; then
   [ -n "$version" ] || fail "could not determine the latest version." \
     "Check your internet connection, or the repository may have no releases yet."
 fi
-num="${version#v}"   # tag là v0.1.0 nhưng tên file dùng 0.1.0
+# Tag có tiền tố "v", tên file thì không. Chuẩn hoá cả hai chiều để
+# HELLOPAY_VERSION nhận được cả "v0.1.0" lẫn "0.1.0".
+num="${version#v}"
+tag="v$num"
 
 archive="${BIN}_${num}_${os}_${arch}.tar.gz"
 # HELLOPAY_BASE_URL chỉ dùng khi thử với server nội bộ. Người dùng thật không đặt biến này.
-base="${HELLOPAY_BASE_URL:-https://github.com/$REPO/releases/download/$version}"
+base="${HELLOPAY_BASE_URL:-https://github.com/$REPO/releases/download/$tag}"
 
 # ─── 4. tải về thư mục tạm rồi tự dọn ────────────────────────────────────────
 tmp=$(mktemp -d)
 # Dọn thư mục tạm dù script thành công, lỗi, hay bị Ctrl-C.
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-say "Downloading $BIN $version..."
+say "Downloading $BIN $tag..."
 dl "$base/$archive"      "$tmp/$archive"      || fail "could not download $base/$archive"
 dl "$base/checksums.txt" "$tmp/checksums.txt" || fail "could not download $base/checksums.txt"
 
@@ -115,6 +119,8 @@ if [ -w "$dir" ]; then
   install -m 0755 "$tmp/$BIN" "$dir/$BIN"
 elif command -v sudo >/dev/null 2>&1; then
   say "Requesting sudo to write to $dir..."
+  # `install` không tạo thư mục cha, nên phải mkdir bằng sudo trước.
+  sudo mkdir -p "$dir" || fail "could not create $dir"
   sudo install -m 0755 "$tmp/$BIN" "$dir/$BIN"
 else
   fail "cannot write to $dir and sudo is not available." \
@@ -126,6 +132,7 @@ fi
 # PATH của terminal đang gọi nó. Việc làm được là ghi vào file cấu hình shell để
 # các terminal mở sau này có sẵn — nên vẫn phải nhắc source hoặc mở shell mới.
 needs_source=false
+path_action=""
 rc=""
 
 case ":$PATH:" in
@@ -153,8 +160,10 @@ case ":$PATH:" in
       # Bỏ qua nếu file đã nhắc tới thư mục này — dù do lần cài trước hay do
       # người dùng tự thêm. Tránh ghi trùng khi cài lại nhiều lần.
       if [ -f "$rc" ] && grep -qF "$dir" "$rc" 2>/dev/null; then
+        path_action=already
         needs_source=true
       elif { printf '\n# hellopay\n%s\n' "$line" >> "$rc"; } 2>/dev/null; then
+        path_action=added
         needs_source=true
       else
         rc="__unwritable__"
@@ -165,7 +174,7 @@ esac
 
 # ─── 8. tóm tắt và bước tiếp theo ────────────────────────────────────────────
 say ""
-say "$BIN $version installed to $dir/$BIN"
+say "$BIN $tag installed to $dir/$BIN"
 say ""
 
 if [ -n "$existing" ] && [ "$existing" != "$dir/$BIN" ]; then
@@ -186,7 +195,11 @@ case "$rc" in
 esac
 
 if [ "$needs_source" = true ]; then
-  say "Added $dir to PATH in $rc"
+  if [ "$path_action" = added ]; then
+    say "Added $dir to PATH in $rc"
+  else
+    say "$dir is already configured in $rc"
+  fi
   say "Run 'source $rc' or open a new terminal, then:"
 else
   say "Get started:"

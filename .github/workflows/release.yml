@@ -30,5 +30,4 @@ jobs:
           # Token riêng để ghi sang repo homebrew-tap và scoop-bucket.
           # Tạo ở Settings → Developer settings → Personal access tokens,
           # rồi thêm vào repo này ở Settings → Secrets → Actions.
-          # Chưa bật Homebrew/Scoop thì dòng này không cần.
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

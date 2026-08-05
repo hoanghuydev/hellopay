@@ -1,7 +1,7 @@
 # GoReleaser cho hellopay — bản tập.
 # Kiểm tra file này:      goreleaser check
-# Build thử không phát hành: goreleaser release --snapshot --clean
-# Phát hành thật:          git tag v0.1.0 && git push --tags   (GitHub Actions tự chạy)
+# Build thử không phát hành: goreleaser release --clean --skip=publish,validate
+# Phát hành thật:          git tag v0.1.2 && git push origin v0.1.2  (GitHub Actions tự chạy)
 version: 2
 
 project_name: hellopay
