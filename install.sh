@@ -15,7 +15,7 @@ set -eu
 REPO="hoanghuydev/hellopay"
 BIN="hellopay"
 
-# Thông báo không màu, một dòng một việc — chạy trong CI hay ghi ra log đều đọc được.
+# Thông báo không màu, một dòng một việc - chạy trong CI hay ghi ra log đều đọc được.
 say()  { printf '%s\n' "$1"; }
 fail() { printf 'Error: %s\n' "$1" >&2; shift; for l in "$@"; do printf '  %s\n' "$l" >&2; done; exit 1; }
 
@@ -85,7 +85,7 @@ dl "$base/checksums.txt" "$tmp/checksums.txt" || fail "could not download $base/
 
 # ─── 5. kiểm chữ ký của checksums.txt ────────────────────────────────────────
 # Đối chiếu mã băm chỉ chứng minh gói khớp với checksums.txt. Nó KHÔNG chứng minh
-# checksums.txt do SePay tạo ra — ai ghi được vào Releases thì sửa được cả hai
+# checksums.txt do SePay tạo ra - ai ghi được vào Releases thì sửa được cả hai
 # file. Chữ ký cosign mới trả lời câu đó: nó gắn với danh tính GitHub Actions của
 # repo này, không phải với một khoá mà ai cũng có thể chép.
 #
@@ -93,21 +93,23 @@ dl "$base/checksums.txt" "$tmp/checksums.txt" || fail "could not download $base/
 # được: thiếu file chữ ký là dừng, vì kẻ thay được gói cũng xoá được nó.
 if [ "${HELLOPAY_SKIP_SIGNATURE:-}" != "1" ] && command -v cosign >/dev/null 2>&1; then
   say "Verifying signature..."
-  dl "$base/checksums.txt.sig" "$tmp/checksums.txt.sig" 2>/dev/null &&
-    dl "$base/checksums.txt.pem" "$tmp/checksums.txt.pem" 2>/dev/null ||
+  if ! dl "$base/checksums.txt.sig" "$tmp/checksums.txt.sig" 2>/dev/null ||
+    ! dl "$base/checksums.txt.pem" "$tmp/checksums.txt.pem" 2>/dev/null; then
     fail "this release has no cosign signature." \
       "Releases are signed from the version that introduced signing onward." \
       "Install a newer version, or set HELLOPAY_SKIP_SIGNATURE=1 to continue with SHA256 only."
+  fi
 
-  cosign verify-blob \
+  if ! cosign verify-blob \
     --certificate "$tmp/checksums.txt.pem" \
     --signature "$tmp/checksums.txt.sig" \
     --certificate-identity-regexp "^https://github\.com/$REPO/\.github/workflows/" \
     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    "$tmp/checksums.txt" >/dev/null 2>&1 ||
+    "$tmp/checksums.txt" >/dev/null 2>&1; then
     fail "signature verification failed." \
       "checksums.txt was not signed by the release workflow of $REPO." \
       "Do not install. Please report this to SePay."
+  fi
   say "Signature verified."
 fi
 
@@ -147,7 +149,7 @@ else
 fi
 mkdir -p "$dir" 2>/dev/null || true
 
-# Bản đang nằm trên PATH trước khi cài — dùng để cảnh báo trùng ở cuối.
+# Bản đang nằm trên PATH trước khi cài - dùng để cảnh báo trùng ở cuối.
 existing=$(command -v "$BIN" 2>/dev/null || true)
 
 if [ -w "$dir" ]; then
@@ -165,7 +167,7 @@ fi
 # ─── 8. đưa thư mục đích vào PATH ────────────────────────────────────────────
 # Giới hạn không lách được: script chạy trong tiến trình con nên không sửa được
 # PATH của terminal đang gọi nó. Việc làm được là ghi vào file cấu hình shell để
-# các terminal mở sau này có sẵn — nên vẫn phải nhắc source hoặc mở shell mới.
+# các terminal mở sau này có sẵn - nên vẫn phải nhắc source hoặc mở shell mới.
 needs_source=false
 path_action=""
 rc=""
@@ -192,7 +194,7 @@ case ":$PATH:" in
           line="export PATH=\"$dir:\$PATH\"" ;;
       esac
 
-      # Bỏ qua nếu file đã nhắc tới thư mục này — dù do lần cài trước hay do
+      # Bỏ qua nếu file đã nhắc tới thư mục này - dù do lần cài trước hay do
       # người dùng tự thêm. Tránh ghi trùng khi cài lại nhiều lần.
       if [ -f "$rc" ] && grep -qF "$dir" "$rc" 2>/dev/null; then
         path_action=already
@@ -239,6 +241,6 @@ if [ "$needs_source" = true ]; then
 else
   say "Get started:"
 fi
-say "  $BIN hello     — print a greeting"
-say "  $BIN version   — show version information"
-say "  $BIN help      — list all commands"
+say "  $BIN hello     - print a greeting"
+say "  $BIN version   - show version information"
+say "  $BIN help      - list all commands"

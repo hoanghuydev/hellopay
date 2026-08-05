@@ -51,3 +51,41 @@ jobs:
         with:
           version: "~> v2"
           args: release --clean --snapshot --skip=sign
+
+  # Hai script cai chay tren may nguoi khac, nen mot loi cu phap la mot lan cai
+  # that bai cua khach hang, khong phai mot build do.
+  install-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck install.sh
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --shell=sh install.sh
+
+      - name: parse install.ps1
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/install.ps1", [ref]$null, [ref]$errors)
+          if ($errors) {
+            $errors | ForEach-Object { Write-Host "::error::$($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+
+      - name: PSScriptAnalyzer install.ps1
+        shell: pwsh
+        run: |
+          # Ghim ban: PSScriptAnalyzer moi doi PowerShell >= 7.4.6, runner khong
+          # luon co, va loi bao ra rat kho hieu.
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          # PSAvoidUsingWriteHost bi loai tru co y: installer in ra console cho
+          # nguoi doc, khong sinh object cho pipeline.
+          $found = Invoke-ScriptAnalyzer -Path install.ps1 -Severity Error,Warning `
+            -ExcludeRule PSAvoidUsingWriteHost
+          if ($found) {
+            $found | Format-Table RuleName,Line,Message -AutoSize -Wrap | Out-String -Width 160 | Write-Host
+            exit 1
+          }
