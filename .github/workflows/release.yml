@@ -32,34 +32,3 @@ jobs:
           # rồi thêm vào repo này ở Settings → Secrets → Actions.
           # Chưa bật Homebrew/Scoop thì dòng này không cần.
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-
-  # GoReleaser chỉ sinh **cask** một cách chính thức. Job này lo phần **formula** —
-  # thứ mà mục `brews` (đã deprecated) từng làm. Chạy sau khi release xong, vì nó
-  # đọc checksums.txt từ chính bản phát hành vừa tạo.
-  # Bỏ job này nếu bạn chọn đi đường cask.
-  homebrew-formula:
-    needs: goreleaser
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Checkout tap
-        uses: actions/checkout@v4
-        with:
-          repository: hoanghuydev/homebrew-tap
-          token: ${{ secrets.TAP_GITHUB_TOKEN }}
-          path: tap
-
-      - name: Regenerate formula
-        run: sh scripts/update-formula.sh "${GITHUB_REF_NAME}" tap/Formula/hellopay.rb
-
-      - name: Commit and push
-        working-directory: tap
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Không có gì thay đổi thì thoát êm, đừng để job đỏ vì một commit rỗng.
-          git diff --quiet && { echo "formula already up to date"; exit 0; }
-          git add Formula/hellopay.rb
-          git commit -m "hellopay: ${GITHUB_REF_NAME}"
-          git push
