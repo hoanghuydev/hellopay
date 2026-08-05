@@ -6,6 +6,7 @@
 # Biến môi trường tuỳ chọn:
 #   HELLOPAY_VERSION=v0.1.0   cài đúng phiên bản này (mặc định: bản mới nhất)
 #   HELLOPAY_INSTALL_DIR=...  thư mục đích (mặc định: ~/.local/bin, hoặc /usr/local/bin nếu chạy root)
+#   HELLOPAY_NO_MODIFY_PATH=1 không tự ghi PATH vào file cấu hình shell
 #
 # Viết bằng POSIX sh (không dùng cú pháp riêng của bash) để chạy được cả với `sh`.
 set -eu
@@ -112,11 +113,50 @@ fi
 
 info "đã cài $dir/$BIN"
 
-# ─── 7. nhắc nếu thư mục đích chưa nằm trong PATH ────────────────────────────
+# ─── 7. đưa thư mục đích vào PATH ────────────────────────────────────────────
+# Giới hạn không lách được: script chạy trong tiến trình con nên KHÔNG sửa được
+# PATH của terminal đang gọi nó. Việc duy nhất làm được là ghi vào file cấu hình
+# shell để các terminal mở sau này có sẵn. Vì thế vẫn phải nhắc mở shell mới.
 case ":$PATH:" in
-  *":$dir:"*) "$dir/$BIN" version || true ;;
-  *)
-    warn "$dir chưa có trong PATH. Thêm dòng này vào ~/.bashrc hoặc ~/.zshrc:"
-    printf '\n    export PATH="%s:$PATH"\n\n' "$dir" >&2
+  *":$dir:"*)
+    # Đã có trong PATH — chạy luôn để người dùng thấy bản vừa cài.
+    "$dir/$BIN" version || true
+    exit 0
     ;;
 esac
+
+if [ "${HELLOPAY_NO_MODIFY_PATH:-}" = "1" ]; then
+  warn "$dir chưa có trong PATH. Thêm dòng này vào file cấu hình shell của bạn:"
+  printf '\n    export PATH="%s:$PATH"\n\n' "$dir" >&2
+  exit 0
+fi
+
+# Chọn file cấu hình theo shell đang dùng. Mỗi shell đọc một file khác nhau, và
+# đoán sai thì ghi xong vẫn không có tác dụng.
+shell_name=$(basename "${SHELL:-/bin/sh}")
+case "$shell_name" in
+  bash) rc="$HOME/.bashrc"; line="export PATH=\"$dir:\$PATH\"" ;;
+  zsh)  rc="${ZDOTDIR:-$HOME}/.zshrc"; line="export PATH=\"$dir:\$PATH\"" ;;
+  fish) rc="$HOME/.config/fish/config.fish"; line="fish_add_path $dir" ;;
+  *)    rc="$HOME/.profile"; line="export PATH=\"$dir:\$PATH\"" ;;
+esac
+
+marker="# added by hellopay installer"
+
+if [ -f "$rc" ] && grep -qF "$marker" "$rc"; then
+  # Đã ghi ở lần cài trước — không ghi thêm, tránh trùng dòng.
+  info "$rc đã có sẵn cấu hình PATH của hellopay"
+else
+  mkdir -p "$(dirname "$rc")" 2>/dev/null || true
+  if { printf '\n%s\n%s\n' "$marker" "$line" >> "$rc"; } 2>/dev/null; then
+    info "đã thêm $dir vào PATH trong $rc"
+  else
+    warn "không ghi được vào $rc. Thêm tay dòng này:"
+    printf '\n    %s\n\n' "$line" >&2
+    exit 0
+  fi
+fi
+
+warn "PATH chỉ có hiệu lực ở terminal MỚI. Dùng ngay trong terminal này thì chạy:"
+printf '\n    source %s\n\n' "$rc" >&2
+info "hoặc gọi bằng đường dẫn đầy đủ: $dir/$BIN version"
