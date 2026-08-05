@@ -37,9 +37,14 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip] # Windows không có sẵn tar
+    # mtime của các file phụ cũng vào thẳng hash của gói .zip/.tar.gz, và mtime
+    # là giờ checkout của từng máy. Không ghim thì hai máy build cùng một commit
+    # ra hai gói khác hash — mà chính hash gói mới là thứ Homebrew/Scoop/winget ghim.
     files:
-      - LICENSE
-      - README.md
+      - src: LICENSE
+        info: { mtime: "{{ .CommitDate }}" }
+      - src: README.md
+        info: { mtime: "{{ .CommitDate }}" }
 
 checksum:
   name_template: checksums.txt # 1 file chứa SHA256 của mọi file còn lại

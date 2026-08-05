@@ -43,7 +43,7 @@ function Install-Hellopay {
     if (-not $version) {
         try {
             $rel = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" `
-                -Headers @{ 'User-Agent' = "$bin-installer" }
+                -Headers @{ 'User-Agent' = "$bin-installer" } -TimeoutSec 60
             $version = $rel.tag_name
         } catch {
             Fail 'could not determine the latest version.' `
@@ -51,19 +51,22 @@ function Install-Hellopay {
             return
         }
     }
-    $num = $version.TrimStart('v')   # tag là v0.1.0 nhưng tên file dùng 0.1.0
+    # Tag có tiền tố "v", tên file thì không. Chuẩn hoá để HELLOPAY_VERSION nhận
+    # được cả "v0.1.0" lẫn "0.1.0".
+    $num = $version.TrimStart('v')
+    $tag = "v$num"
 
     $archive = "${bin}_${num}_windows_${arch}.zip"
-    $base    = "https://github.com/$repo/releases/download/$version"
+    $base    = "https://github.com/$repo/releases/download/$tag"
 
     # ─── 3. tải về thư mục tạm ───────────────────────────────────────────────
     $tmp = Join-Path $env:TEMP ("$bin-" + [guid]::NewGuid())
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     try {
-        Say "Downloading $bin $version..."
+        Say "Downloading $bin $tag..."
         try {
-            Invoke-WebRequest "$base/$archive"      -OutFile (Join-Path $tmp $archive)        -UseBasicParsing
-            Invoke-WebRequest "$base/checksums.txt" -OutFile (Join-Path $tmp 'checksums.txt') -UseBasicParsing
+            Invoke-WebRequest "$base/$archive"      -OutFile (Join-Path $tmp $archive)        -UseBasicParsing -TimeoutSec 600
+            Invoke-WebRequest "$base/checksums.txt" -OutFile (Join-Path $tmp 'checksums.txt') -UseBasicParsing -TimeoutSec 60
         } catch {
             Fail "could not download $base/$archive" @($_.Exception.Message)
             return
@@ -98,7 +101,9 @@ function Install-Hellopay {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
 
         # Bản đang nằm trên PATH trước khi cài — dùng để cảnh báo trùng ở cuối.
-        $existing = (Get-Command $bin -ErrorAction SilentlyContinue).Source
+        # Lấy qua biến trung gian: dưới StrictMode, đọc .Source trên null là lỗi.
+        $found    = Get-Command $bin -CommandType Application -ErrorAction SilentlyContinue
+        $existing = if ($found) { $found.Source } else { $null }
 
         $target = Join-Path $dir "$bin.exe"
         try {
@@ -112,7 +117,10 @@ function Install-Hellopay {
         # Windows có đúng một chỗ chính thức cho PATH của người dùng, nên không
         # phải đoán file cấu hình như bên Unix. Nhưng cửa sổ terminal đang mở đã
         # nạp PATH cũ, nên vẫn phải mở cửa sổ mới.
+        # Khởi tạo trước: nếu người dùng bật Set-StrictMode trong $PROFILE thì đọc
+        # một biến chưa gán sẽ làm script chết.
         $needsRestart = $false
+        $manual       = $false
         $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
         $onPath   = ($env:Path -split ';') -contains $dir
 
@@ -129,7 +137,7 @@ function Install-Hellopay {
 
         # ─── 7. tóm tắt và bước tiếp theo ────────────────────────────────────
         Say ''
-        Say "$bin $version installed to $target"
+        Say "$bin $tag installed to $target"
         Say ''
 
         if ($existing -and $existing -ne $target) {
