@@ -22,7 +22,11 @@ REGISTRY=${1:-}
 WORK=$(mktemp -d)
 TGZ=$WORK/tgz
 mkdir -p "$TGZ"
-trap 'rm -rf "$WORK"; rm -rf "$HOME/.cache/hellopay"' EXIT
+# Đẩy bộ nhớ đệm kiểm mã băm vào thư mục tạm: các ca test không được đụng tới
+# ~/.cache của người đang chạy, và mỗi lần chạy phải bắt đầu từ đệm rỗng thì ca 12
+# mới đo đúng thứ nó tưởng đang đo.
+export XDG_CACHE_HOME=$WORK/cache
+trap 'rm -rf "$WORK"' EXIT
 
 pass=0
 fail=0

@@ -44,9 +44,21 @@ names.forEach(function (name) {
   const key = name.replace(/^@hellopay\/cli-/, "");
   const binName = key.indexOf("win32") === 0 ? CLI + ".exe" : CLI;
 
-  const args = ["pack", name + "@" + version, "--pack-destination", tmp, "--silent"];
+  // --prefer-online: không có nó thì npm phục vụ được từ bộ nhớ đệm cục bộ, và bước
+  // này sẽ đang so gói vừa đóng với chính nó thay vì với thứ kho gói trả về.
+  const args = [
+    "pack", name + "@" + version, "--pack-destination", tmp, "--silent", "--prefer-online",
+  ];
   if (registry) args.push("--registry", registry);
-  const packed = spawnSync("npm", args, { encoding: "utf8", shell: false, cwd: tmp });
+
+  // Một gói vừa publish cần vài giây để thấy được ở mọi nơi. Thất bại giả ở đây là
+  // thất bại đắt nhất của cả pipeline: số phiên bản đã bị đốt và phải tăng số.
+  let packed;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    packed = spawnSync("npm", args, { encoding: "utf8", shell: false, cwd: tmp });
+    if (packed.status === 0) break;
+    if (attempt < 5) spawnSync("sleep", [String(attempt * 3)], { shell: false });
+  }
   if (packed.status !== 0) {
     problems.push(name + ": could not download from the registry — " + String(packed.stderr).trim());
     return;

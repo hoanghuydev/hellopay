@@ -55,7 +55,9 @@ jobs:
         with:
           name: dist
           path: dist/
-          retention-days: 1
+          # Job npm chờ người phê duyệt môi trường `release`. Để 1 ngày thì một lần
+          # phê duyệt muộn làm artifact biến mất và job không chạy lại được nữa.
+          retention-days: 7
 
   # ───────────────────────────────────────────────────────────────────────────
   # Kênh 7 — npm/npx. Job RIÊNG, không phải một bước trong job trên. Ba lý do:
@@ -99,63 +101,77 @@ jobs:
           }
           echo "npm $have, node $(node --version)"
 
-      # ── Bước 1 ── dựng gói. Bảng mã băm phải suy ra từ checksums.txt ĐÃ CÓ CHỮ KÝ.
+      # Bước 1 — dựng gói. Bảng mã băm phải suy ra từ checksums.txt ĐÃ CÓ CHỮ KÝ.
       # --require-signature biến "không có chữ ký" từ cảnh báo thành lỗi.
       - name: dựng 7 gói từ file nén đã ký
         run: |
           node npm/build-packages.js --require-signature
           node npm/verify.js
 
-      # ── Bước 2 ── cửa chặn chiếm tên và trùng số phiên bản. Phải là CHƯA CÓ.
-      - name: 6 gói nền tảng ở số phiên bản này phải chưa tồn tại
+      # Bước 2 — cửa chặn chiếm tên và trùng số phiên bản.
+      # Cửa này phải HỎNG ĐÓNG: chỉ 404 mới là "chưa có". Mọi mã khác (000 khi hỏng
+      # DNS, 429, 5xx) nghĩa là "không biết", và một cửa chống trùng tên mà coi "không
+      # biết" là "chưa có" thì chỉ còn là trang trí.
+      - name: 7 tên ở số phiên bản này phải chưa tồn tại
         run: |
           v=$(node -p "require('./dist/npm/hellopay/package.json').version")
+          names="hellopay $(node -p "Object.keys(require('./dist/npm/hellopay/package.json').optionalDependencies).join(' ')")"
           fail=0
-          for name in hellopay $(node -p "Object.keys(require('./dist/npm/hellopay/package.json').optionalDependencies).join(' ')"); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/$name/$v")
-            if [ "$code" = "200" ]; then
-              echo "::error::$name@$v đã tồn tại trên kho gói — dừng toàn bộ"
-              fail=1
-            fi
+          for name in $names; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 3 --retry-all-errors \
+              --max-time 30 "https://registry.npmjs.org/$name/$v")
+            case "$code" in
+              404) ;;
+              200)
+                echo "::error::$name@$v đã tồn tại. KHÔNG xoá gói: tăng số phiên bản, dán tag mới, chạy lại từ đầu (§5.9.6)"
+                fail=1 ;;
+              *)
+                echo "::error::không hỏi được kho gói về $name@$v (HTTP $code). Dừng, không đoán là chưa có"
+                fail=1 ;;
+            esac
           done
           exit $fail
 
       - name: chạy thử publish cả 7
         run: |
-          for d in dist/npm/*/; do (cd "$d" && npm publish --dry-run --access public --tag pending); done
+          for d in dist/npm/*/; do (cd "$d" && npm publish --dry-run --access public); done
 
-      # ── Bước 3 ── 6 gói nền tảng lên trước, nhãn `pending`. Chưa có gì trỏ tới chúng.
-      - name: publish 6 gói nền tảng (nhãn pending)
+      # Bước 3 — 6 gói nền tảng lên trước.
+      # Nhãn `latest` của CHÚNG không mang ý nghĩa gì: không ai cài chúng trực tiếp, và
+      # gói bọc ghim số phiên bản CHÍNH XÁC nên nhãn không tham gia vào việc phân giải.
+      # Nhãn duy nhất có ý nghĩa là nhãn của GÓI BỌC, và gói bọc lên cuối cùng, bước 6.
+      #
+      # Cố ý KHÔNG có `npm dist-tag` ở bất kỳ đâu trong job này. Cơ chế publish không
+      # cần token đổi OIDC lấy token BÊN TRONG một lần `npm publish`, và token đó chỉ
+      # sống trong bộ nhớ của đúng tiến trình ấy (`config.set(..., 'user')` ở
+      # lib/utils/oidc.js của npm, không có lời gọi save nào). Một lệnh `npm dist-tag`
+      # riêng là tiến trình mới, không có gì để xác thực, và chết với E401. Cách duy
+      # nhất làm nó chạy là cất một mật khẩu vào GitHub — đúng thứ cơ chế này tồn tại
+      # để loại bỏ.
+      - name: publish 6 gói nền tảng
         run: |
-          for d in dist/npm/cli-*/; do (cd "$d" && npm publish --access public --tag pending --provenance); done
+          for d in dist/npm/cli-*/; do (cd "$d" && npm publish --access public --provenance); done
 
-      # ── Bước 4 ── CỬA QUAN TRỌNG NHẤT. Tải LẠI 6 gói TỪ KHO GÓI (không lấy từ
-      # dist/ trên máy), băm lại binary bên trong, so với bảng trong gói bọc CHƯA
-      # publish. Bắt được cả việc bị đổi ở phía kho gói lẫn sai sót lúc tải lên.
+      # Bước 4 — CỬA QUAN TRỌNG NHẤT. Tải LẠI 6 gói TỪ KHO GÓI (không lấy từ dist/ trên
+      # máy), băm lại binary bên trong, so với bảng trong gói bọc CHƯA publish.
       - name: tải lại từ kho gói và so mã băm
         run: node npm/verify-published.js
 
-      # ── Bước 5 ── gói bọc, cũng nhãn `pending`.
-      - name: publish gói bọc (nhãn pending)
-        run: cd dist/npm/hellopay && npm publish --access public --tag pending --provenance
-
-      # ── Bước 6 ── cài thử trên máy sạch, chạy đúng cơ chế so mã băm trên gói thật.
-      - name: cài thử từ kho gói
+      # Bước 5 — cài thử ĐÚNG file gói bọc sắp publish, trong một project sạch, với 6
+      # gói nền tảng lấy từ kho gói thật. Chạy TRƯỚC khi publish gói bọc, nên hỏng ở
+      # đây thì chưa có gì trỏ vào bản này. Đây là chỗ cơ chế so mã băm chạy thật.
+      - name: cài thử gói bọc trước khi publish
         run: |
           v=$(node -p "require('./dist/npm/hellopay/package.json').version")
+          name=$(cd dist/npm/hellopay && npm pack --silent)
+          tgz="$PWD/dist/npm/hellopay/$name"
           t=$(mktemp -d) && cd "$t" && npm init -y >/dev/null
-          npm install --ignore-scripts "hellopay@$v"
+          npm install --ignore-scripts "$tgz"
           out=$(./node_modules/.bin/hellopay version)
           echo "$out"
           echo "$out" | grep -q "$v" || { echo "::error::bản cài về không phải $v"; exit 1; }
 
-      # ── Bước 7 ── HÀNH ĐỘNG PHÁT HÀNH. Chỉ tới đây nhãn latest mới di chuyển:
-      # 6 gói nền tảng TRƯỚC, gói bọc CUỐI CÙNG. Đảo thứ tự nghĩa là có một khoảnh
-      # khắc latest trỏ vào gói bọc đòi những gói nền tảng chưa ai thấy.
-      - name: chuyển nhãn latest
-        run: |
-          v=$(node -p "require('./dist/npm/hellopay/package.json').version")
-          for name in $(node -p "Object.keys(require('./dist/npm/hellopay/package.json').optionalDependencies).join(' ')"); do
-            npm dist-tag add "$name@$v" latest
-          done
-          npm dist-tag add "hellopay@$v" latest
+      # Bước 6 — HÀNH ĐỘNG PHÁT HÀNH. Một lệnh, và là lệnh cuối cùng: từ giây này
+      # `npx hellopay` trỏ vào bản mới. Mọi cửa đã qua trước khi tới đây.
+      - name: publish gói bọc
+        run: cd dist/npm/hellopay && npm publish --access public --provenance

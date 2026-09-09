@@ -8,12 +8,16 @@ on:
 permissions:
   contents: read
 
+# Action ghim theo mã commit đầy đủ, không theo tag: tag đổi được, mã commit thì không
+# (vụ tj-actions/changed-files 03/2025 là một tag bị đẩy lại). Dependabot cập nhật;
+# đừng sửa tay.
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.26"
 
@@ -30,8 +34,8 @@ jobs:
   release-config:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "~> v2"
           args: check
@@ -41,13 +45,13 @@ jobs:
   release-dry-run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.26"
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "~> v2"
           args: release --clean --snapshot --skip=sign
@@ -57,7 +61,7 @@ jobs:
   install-scripts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: shellcheck install.sh
         run: |
@@ -135,7 +139,10 @@ jobs:
           block '(process\.env\.[A-Z_]*(BINARY|BIN_PATH|PATH_OVERRIDE))' \
             'không được cho phép đổi đường dẫn binary bằng biến môi trường — nó vô hiệu hoá chuỗi mã băm'
           # "scripts" trong bất kỳ package.json nào của kênh npm = có code chạy lúc cài.
-          for f in $(find npm dist/npm -name package.json 2>/dev/null); do
+          # Chỉ quét khuôn trong repo — dist/npm chưa tồn tại ở bước này. Các file
+          # package.json SINH RA, tức là các file thật sự được publish, do npm/verify.js
+          # kiểm sau khi dựng.
+          for f in $(find npm -name package.json); do
             if node -e "process.exit(require('./$f').scripts ? 1 : 0)"; then :; else
               echo "::error::$f khai scripts — không script nào được chạy lúc cài"
               fail=1

@@ -114,7 +114,13 @@ function rememberVerified(binPath, expected) {
       data = {};
     }
     data[binPath] = cacheKey(st, expected);
-    fs.writeFileSync(file, JSON.stringify(data), { mode: 0o600 });
+    // Ghi ra file tạm rồi đổi tên. Ghi thẳng thì `writeFileSync` đi theo liên kết mềm,
+    // nên một liên kết mềm đặt sẵn ở chỗ file đệm sẽ bị ghi đè mất nội dung; và `mode`
+    // chỉ có tác dụng lúc TẠO file, nên một file cũ ai cũng đọc được sẽ giữ nguyên
+    // quyền cũ. Đổi tên thì thay hẳn inode, cả hai vấn đề biến mất.
+    const temp = file + "." + process.pid + ".tmp";
+    fs.writeFileSync(temp, JSON.stringify(data), { mode: 0o600 });
+    fs.renameSync(temp, file);
   } catch (e) {
     // Đệm hỏng chỉ làm lệnh chậm hơn. Không bao giờ được làm lệnh thất bại.
   }
@@ -211,6 +217,11 @@ function main() {
     windowsHide: true,
   });
 
+  // Trên Windows, `child.kill(sig)` là TerminateProcess chứ không phải một tín hiệu:
+  // binary không chạy được phần dọn dẹp của nó. Bấm Ctrl-C thật trong console thì
+  // Windows gửi thẳng tới cả nhóm tiến trình nên vẫn dọn sạch — chỉ có đường gọi
+  // child.kill/taskkill từ chương trình khác là không. Ca 10 (§5.9.5) đo đúng đường
+  // Ctrl-C thật; đường kia chưa có ai đo.
   const forward = function (sig) {
     return function () {
       try {
