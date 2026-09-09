@@ -51,13 +51,30 @@ names.forEach(function (name) {
   ];
   if (registry) args.push("--registry", registry);
 
-  // Một gói vừa publish cần vài giây để thấy được ở mọi nơi. Thất bại giả ở đây là
-  // thất bại đắt nhất của cả pipeline: số phiên bản đã bị đốt và phải tăng số.
+  // Cửa sổ thử lại phải tính bằng PHÚT, không phải giây. Kho gói nhận gói xong (HTTP
+  // 200 cho publish) nhưng trang mô tả gói mất một lúc mới đọc được ở mọi nơi; đo thật
+  // hai lần trên registry.npmjs.org đều ra 3-5 phút, và không đều giữa các gói — một
+  // lần chạy có 3/6 gói kịp còn 3 gói thì chưa.
+  //
+  // Thất bại giả ở đây là thất bại đắt nhất của pipeline: số phiên bản bị đốt và phải
+  // tăng số cho cả 7 gói. Chờ thêm vài phút rẻ hơn nhiều. Ngược lại, KHÔNG được bỏ hẳn
+  // việc kiểm để cho nhanh: đây là cửa duy nhất nhìn thấy thứ kho gói thật sự trả về.
+  const MAX_WAIT_MS = 10 * 60 * 1000;
+  const deadline = Date.now() + MAX_WAIT_MS;
   let packed;
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  let waited = 0;
+  for (let attempt = 1; ; attempt++) {
     packed = spawnSync("npm", args, { encoding: "utf8", shell: false, cwd: tmp });
     if (packed.status === 0) break;
-    if (attempt < 5) spawnSync("sleep", [String(attempt * 3)], { shell: false });
+    if (Date.now() >= deadline) break;
+    const backoff = Math.min(15, attempt * 2);
+    waited += backoff;
+    if (attempt === 1 || attempt % 5 === 0) {
+      process.stdout.write(
+        "  " + name + ": chưa đọc được từ kho gói, đã chờ " + waited + "s (tối đa 600s)\n"
+      );
+    }
+    spawnSync("sleep", [String(backoff)], { shell: false });
   }
   if (packed.status !== 0) {
     problems.push(name + ": could not download from the registry — " + String(packed.stderr).trim());
