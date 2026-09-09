@@ -152,10 +152,12 @@ jobs:
 
       # Dựng thật rồi mới kiểm. Không có bước này thì mọi bước dưới chỉ đang kiểm
       # một thư mục rỗng và vẫn xanh.
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: "~> v2"
+          install-only: true
       - name: dựng 6 binary
-        run: |
-          curl -sfL https://goreleaser.com/static/run | \
-            DISTRIBUTION=oss VERSION=v2 bash -s -- release --clean --snapshot --skip=sign
+        run: goreleaser release --clean --snapshot --skip=sign
       - run: node npm/build-packages.js
       - run: node npm/verify.js
 

@@ -100,8 +100,6 @@ homebrew_casks:
     homepage: https://github.com/hoanghuydev/hellopay
     description: A fake CLI for practising releases
     binaries: [hellopay]
-    url:
-      verified: "github.com/hoanghuydev/hellopay/"
     # Binary chưa được Apple ký/notarize thì macOS sẽ chặn. Hook này xoá cờ
     # "tải từ Internet" ngay sau khi cài. Đây là cách chữa cháy, không phải cách đúng
     # — cách đúng là ký bằng Developer ID + notarize (xem mục 6 của hướng dẫn).
