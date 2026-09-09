@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write # cần quyền này để tạo GitHub Release và upload file
-  id-token: write # cosign ký không cần khoá, danh tính lấy qua OIDC
+  id-token: write # cosign ký không cần khoá; VÀ publish npm không cần token — cả hai dùng chung dòng này
 
 # Hai tag đẩy lên sát nhau sẽ tranh nhau ghi vào repo tap/bucket. Xếp hàng thay vì
 # huỷ job cũ: một bản phát hành đang dở mà bị huỷ giữa đường thì tệ hơn là chờ.
@@ -19,17 +19,24 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Tag Git đổi được, mã commit thì không. Vụ tj-actions/changed-files (03/2025)
+      # là chuyện một tag bị đẩy lại trỏ sang code khác. Ghim theo mã commit đầy đủ.
+      # Cập nhật bằng Dependabot, đừng sửa tay.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # GoReleaser cần toàn bộ history + tag để dựng changelog
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.26"
+          # Job phát hành không được nhận lại dữ liệu tạm mà một branch khác đã ghi:
+          # nếu bộ nhớ tạm bị đầu độc thì checksums.txt và chữ ký cosign sẽ chứng thực
+          # rất trung thực một binary đã hỏng. Đổi 1-2 phút lấy một chuỗi tin cậy sạch.
+          cache: false
 
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "~> v2"
           args: release --clean
@@ -40,3 +47,115 @@ jobs:
           # Tạo ở Settings → Developer settings → Personal access tokens,
           # rồi thêm vào repo này ở Settings → Secrets → Actions.
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+      # Chuyển dist/ sang job npm. KHÔNG dùng `gh release download`: bản tải về từ
+      # Releases không có artifacts.json/metadata.json, nên job npm sẽ phải đọc tên
+      # file mà cắt chuỗi — đúng cái HUONG-DAN-PHAT-HANH-CLI.md §1.1 cấm.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Kênh 7 — npm/npx. Job RIÊNG, không phải một bước trong job trên. Ba lý do:
+  #   1. quyền publish npm không được có mặt trong bước đang giữ TAP_GITHUB_TOKEN;
+  #   2. npm publish hỏng thì bản release đã lên vẫn nguyên, và chạy lại được RIÊNG;
+  #   3. job trên cần Go, job này cần Node — trộn vào làm chậm mọi lần chạy.
+  #
+  # KHÔNG được tách job này ra một workflow dùng chung, và KHÔNG được cho chạy tay:
+  # cơ chế publish không cần token của npm kiểm TÊN FILE workflow, nên cả hai cách
+  # đó làm nó không nhận. Đây là bẫy khi dọn code — cùng loại với comment ở
+  # .goreleaser.yaml:34-35 ("Tên file này là hợp đồng giữa 4 kênh").
+  npm:
+    needs: goreleaser
+    runs-on: ubuntu-latest # cơ chế publish không cần token CHỈ chạy trên máy ảo của GitHub
+    # Bỏ qua bản thử nghiệm. Điều kiện này khớp đúng cách GoReleaser hiểu "bản thử
+    # nghiệm" (.goreleaser.yaml:76 `prerelease: auto` = tag có dấu `-`). ĐỪNG đổi
+    # thành tìm chữ "rc"/"beta": v0.2.0-alpha1 sẽ lọt lên nhãn latest trong khi
+    # Homebrew và Scoop cố tình bỏ qua đúng tag đó.
+    if: ${{ !contains(github.ref_name, '-') }}
+    environment: release # bắt buộc có người phê duyệt, không cho tự phê duyệt
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22" # >= 22.14.0, yêu cầu của publish không cần token
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: npm phải đủ mới cho publish không cần token
+        run: |
+          npm install -g npm@latest
+          need=11.5.1
+          have=$(npm --version)
+          # Hỏng thì phải BÁO LỖI TO. Không bao giờ âm thầm publish bằng đường khác.
+          [ "$(printf '%s\n%s\n' "$need" "$have" | sort -V | head -1)" = "$need" ] || {
+            echo "::error::npm $have < $need — publish không cần token sẽ không hoạt động"
+            exit 1
+          }
+          echo "npm $have, node $(node --version)"
+
+      # ── Bước 1 ── dựng gói. Bảng mã băm phải suy ra từ checksums.txt ĐÃ CÓ CHỮ KÝ.
+      # --require-signature biến "không có chữ ký" từ cảnh báo thành lỗi.
+      - name: dựng 7 gói từ file nén đã ký
+        run: |
+          node npm/build-packages.js --require-signature
+          node npm/verify.js
+
+      # ── Bước 2 ── cửa chặn chiếm tên và trùng số phiên bản. Phải là CHƯA CÓ.
+      - name: 6 gói nền tảng ở số phiên bản này phải chưa tồn tại
+        run: |
+          v=$(node -p "require('./dist/npm/hellopay/package.json').version")
+          fail=0
+          for name in hellopay $(node -p "Object.keys(require('./dist/npm/hellopay/package.json').optionalDependencies).join(' ')"); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/$name/$v")
+            if [ "$code" = "200" ]; then
+              echo "::error::$name@$v đã tồn tại trên kho gói — dừng toàn bộ"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: chạy thử publish cả 7
+        run: |
+          for d in dist/npm/*/; do (cd "$d" && npm publish --dry-run --access public --tag pending); done
+
+      # ── Bước 3 ── 6 gói nền tảng lên trước, nhãn `pending`. Chưa có gì trỏ tới chúng.
+      - name: publish 6 gói nền tảng (nhãn pending)
+        run: |
+          for d in dist/npm/cli-*/; do (cd "$d" && npm publish --access public --tag pending --provenance); done
+
+      # ── Bước 4 ── CỬA QUAN TRỌNG NHẤT. Tải LẠI 6 gói TỪ KHO GÓI (không lấy từ
+      # dist/ trên máy), băm lại binary bên trong, so với bảng trong gói bọc CHƯA
+      # publish. Bắt được cả việc bị đổi ở phía kho gói lẫn sai sót lúc tải lên.
+      - name: tải lại từ kho gói và so mã băm
+        run: node npm/verify-published.js
+
+      # ── Bước 5 ── gói bọc, cũng nhãn `pending`.
+      - name: publish gói bọc (nhãn pending)
+        run: cd dist/npm/hellopay && npm publish --access public --tag pending --provenance
+
+      # ── Bước 6 ── cài thử trên máy sạch, chạy đúng cơ chế so mã băm trên gói thật.
+      - name: cài thử từ kho gói
+        run: |
+          v=$(node -p "require('./dist/npm/hellopay/package.json').version")
+          t=$(mktemp -d) && cd "$t" && npm init -y >/dev/null
+          npm install --ignore-scripts "hellopay@$v"
+          out=$(./node_modules/.bin/hellopay version)
+          echo "$out"
+          echo "$out" | grep -q "$v" || { echo "::error::bản cài về không phải $v"; exit 1; }
+
+      # ── Bước 7 ── HÀNH ĐỘNG PHÁT HÀNH. Chỉ tới đây nhãn latest mới di chuyển:
+      # 6 gói nền tảng TRƯỚC, gói bọc CUỐI CÙNG. Đảo thứ tự nghĩa là có một khoảnh
+      # khắc latest trỏ vào gói bọc đòi những gói nền tảng chưa ai thấy.
+      - name: chuyển nhãn latest
+        run: |
+          v=$(node -p "require('./dist/npm/hellopay/package.json').version")
+          for name in $(node -p "Object.keys(require('./dist/npm/hellopay/package.json').optionalDependencies).join(' ')"); do
+            npm dist-tag add "$name@$v" latest
+          done
+          npm dist-tag add "hellopay@$v" latest

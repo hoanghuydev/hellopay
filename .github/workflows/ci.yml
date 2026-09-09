@@ -89,3 +89,101 @@ jobs:
             $found | Format-Table RuleName,Line,Message -AutoSize -Wrap | Out-String -Width 160 | Write-Host
             exit 1
           }
+
+  # Kênh npm. Tinh thần giống install-scripts ở trên: một lỗi ở đây là một lần cài
+  # thất bại của khách hàng, không phải một build đỏ.
+  #
+  # Action ghim theo mã commit đầy đủ — xem lý do ở .github/workflows/release.yml.
+  npm-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # goreleaser cần tag để suy ra số phiên bản
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: cú pháp JavaScript
+        run: |
+          fail=0
+          for f in $(find npm -name '*.js'); do
+            node --check "$f" || fail=1
+          done
+          exit $fail
+
+      # Ba ràng buộc ở HUONG-DAN-PHAT-HANH-CLI.md §5.9 chỉ tồn tại nếu có thứ gì chặn việc
+      # quay lại đường cũ. Chặn bằng lời nói thì sẽ có người thêm lại.
+      - name: chặn quay lại đường cũ
+        run: |
+          fail=0
+          block() { # block <mẫu> <lý do>
+            if grep -rnE "$1" npm/ --include='*.js'; then
+              echo "::error::$2"
+              fail=1
+            fi
+          }
+          block 'shell:\s*true' \
+            'shell: true biến một đối số như --ref "a & calc" thành hai câu lệnh'
+          # Mẫu phải khớp cả `cp.exec(`, không chỉ `child_process.exec(`: một
+          # `const cp = require("child_process")` là đủ để lọt qua dạng viết đủ tên.
+          block '\bexec(Sync)?\(' \
+            'exec() chạy qua shell. Dùng spawn() với mảng đối số'
+          block '(process\.env\.[A-Z_]*(BINARY|BIN_PATH|PATH_OVERRIDE))' \
+            'không được cho phép đổi đường dẫn binary bằng biến môi trường — nó vô hiệu hoá chuỗi mã băm'
+          # "scripts" trong bất kỳ package.json nào của kênh npm = có code chạy lúc cài.
+          for f in $(find npm dist/npm -name package.json 2>/dev/null); do
+            if node -e "process.exit(require('./$f').scripts ? 1 : 0)"; then :; else
+              echo "::error::$f khai scripts — không script nào được chạy lúc cài"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      # Dựng thật rồi mới kiểm. Không có bước này thì mọi bước dưới chỉ đang kiểm
+      # một thư mục rỗng và vẫn xanh.
+      - name: dựng 6 binary
+        run: |
+          curl -sfL https://goreleaser.com/static/run | \
+            DISTRIBUTION=oss VERSION=v2 bash -s -- release --clean --snapshot --skip=sign
+      - run: node npm/build-packages.js
+      - run: node npm/verify.js
+
+      # Chạy thử file trung gian THẬT: đóng gói → cài từ file .tgz → chạy → so số
+      # phiên bản. Máy ảo CI là Linux x64, đúng 1 trong 6 tổ hợp.
+      # Kèm luôn các ca hỏng: sửa 1 byte, thiếu gói nền tảng, Ctrl-C, mã thoát.
+      - name: chạy bộ ca test của mục 10
+        run: bash npm/test-local.sh
+
+      # Đường lỗi phải là thông báo của mình, không phải đoạn lỗi kỹ thuật của Node.
+      - name: máy không được hỗ trợ → báo lỗi tử tế
+        run: |
+          set +e
+          out=$(node -e "
+            Object.defineProperty(process,'platform',{value:'freebsd'});
+            Object.defineProperty(process,'arch',{value:'arm'});
+            require('./npm/bin/hellopay.js');
+          " 2>&1 >/dev/null)
+          code=$?
+          echo "$out"
+          if [ "$code" = "0" ]; then
+            echo "::error::đáng lẽ phải thoát khác 0"; exit 1
+          fi
+          if ! echo "$out" | grep -q '^Error: unsupported platform'; then
+            echo "::error::thiếu dòng Error: unsupported platform"; exit 1
+          fi
+          if echo "$out" | grep -qE 'at [A-Za-z]+ \(|node:internal'; then
+            echo "::error::rò đoạn lỗi kỹ thuật của Node ra mặt người dùng"; exit 1
+          fi
+
+      # Chạy thử publish. Bắt các lỗi chỉ npm mới biết: tên, số phiên bản, khai lệnh,
+      # khai hệ/CPU, khai gói nền tảng. --tag next là bắt buộc vì bản dựng trong CI là
+      # bản thử nghiệm, và npm TỪ CHỐI publish bản thử nghiệm nếu không chỉ định nhãn.
+      - name: chạy thử publish cả 7 gói
+        run: |
+          for d in dist/npm/*/; do
+            (cd "$d" && npm publish --dry-run --access public --tag next)
+          done

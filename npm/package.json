@@ -1,0 +1,31 @@
+{
+  "name": "hellopay",
+  "version": "0.0.0",
+  "description": "A fake CLI for practising releases",
+  "keywords": ["cli", "hellopay"],
+  "homepage": "https://github.com/hoanghuydev/hellopay",
+  "bugs": "https://github.com/hoanghuydev/hellopay/issues",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoanghuydev/hellopay.git"
+  },
+  "bin": {
+    "hellopay": "bin/hellopay.js"
+  },
+  "files": ["bin"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "optionalDependencies": {
+    "@hellopay/cli-darwin-arm64": "0.0.0",
+    "@hellopay/cli-darwin-x64": "0.0.0",
+    "@hellopay/cli-linux-arm64": "0.0.0",
+    "@hellopay/cli-linux-x64": "0.0.0",
+    "@hellopay/cli-win32-arm64": "0.0.0",
+    "@hellopay/cli-win32-x64": "0.0.0"
+  },
+  "hellopay": {
+    "binaryHashes": {}
+  }
+}

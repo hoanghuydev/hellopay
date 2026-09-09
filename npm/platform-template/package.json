@@ -1,0 +1,15 @@
+{
+  "name": "@hellopay/cli-PLATFORM",
+  "version": "0.0.0",
+  "description": "hellopay binary for OS/CPU",
+  "license": "MIT",
+  "homepage": "https://github.com/hoanghuydev/hellopay",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoanghuydev/hellopay.git"
+  },
+  "os": ["OS"],
+  "cpu": ["CPU"],
+  "files": ["bin"],
+  "preferUnplugged": true
+}

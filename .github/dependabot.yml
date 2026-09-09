@@ -1,0 +1,9 @@
+# Các action trong workflow được ghim theo mã commit đầy đủ (xem comment ở release.yml).
+# Ghim mà không có ai cập nhật thì thành ghim vào một bản có lỗ hổng, nên Dependabot
+# là phần bắt buộc đi kèm, không phải phần thêm cho vui.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
