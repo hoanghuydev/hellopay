@@ -12,6 +12,13 @@
 // Cố ý KHÔNG so với dist/ trên máy: dist/ chính là thứ vừa tải lên, nên so nó với
 // chính nó thì không chứng minh được gì. Nguồn duy nhất có giá trị ở bước này là
 // thứ kho gói trả về cho một người dùng thật.
+//
+// CHỈ CHẠY ĐƯỢC TRONG JOB PHÁT HÀNH. Nó so gói trên kho với bảng mã băm trong dist/
+// của CÙNG một lần build. Chạy trên máy lập trình viên với một dist/ dựng tại chỗ thì
+// gần như chắc chắn lệch, và lệch vì lý do vô hại: chỉ cần Go khác một số hiệu bản vá
+// (đo thật: máy 1.26.5 vs CI 1.26.8) là ra binary khác. Thông báo "does not match" khi
+// ấy đọc như một sự cố an ninh trong khi không có gì xảy ra — và một cảnh báo hay kêu
+// oan là một cảnh báo sẽ bị bỏ qua vào đúng lúc nó kêu thật.
 
 const { spawnSync } = require("child_process");
 const crypto = require("crypto");
@@ -37,8 +44,29 @@ if (names.length !== 6) {
   process.exit(1);
 }
 
+if (!process.env.CI) {
+  process.stdout.write(
+    "Note: not running in CI. A mismatch below is most likely a different Go\n" +
+      "  patch release on this machine, not a tampered package. This check is\n" +
+      "  only conclusive on the dist/ produced by the release job itself.\n"
+  );
+}
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "hellopay-verify-"));
 const problems = [];
+
+// Hạn chờ CHUNG cho cả 6 gói. Nếu mỗi gói một hạn 10 phút thì một lỗi vĩnh viễn tốn
+// một tiếng mới báo ra.
+const wi = process.argv.indexOf("--max-wait");
+const MAX_WAIT_S = wi !== -1 ? parseInt(process.argv[wi + 1], 10) : 600;
+const DEADLINE = Date.now() + MAX_WAIT_S * 1000;
+
+// Chỉ những mã này mới đáng bỏ cuộc ngay: chúng không đổi theo thời gian.
+// MỌI THỨ CÒN LẠI đều chờ, kể cả mã lạ. Mặc định của một cửa an toàn là kiên nhẫn.
+// Hai số phiên bản đã bị đốt vì làm ngược lại: bản vá trước chỉ chờ khi lỗi chứa
+// "404", nhưng lỗi thật trong lúc kho gói lan truyền dở là ETARGET ("gói có, phiên
+// bản này chưa thấy") — không có chữ 404 nào trong đó.
+const PERMANENT = /E401|E403|ENEEDAUTH|EPERM|EUSAGE|EINVALIDTAGNAME/;
 
 names.forEach(function (name) {
   const key = name.replace(/^@hellopay\/cli-/, "");
@@ -47,7 +75,7 @@ names.forEach(function (name) {
   // --prefer-online: không có nó thì npm phục vụ được từ bộ nhớ đệm cục bộ, và bước
   // này sẽ đang so gói vừa đóng với chính nó thay vì với thứ kho gói trả về.
   const args = [
-    "pack", name + "@" + version, "--pack-destination", tmp, "--silent", "--prefer-online",
+    "pack", name + "@" + version, "--pack-destination", tmp, "--prefer-online",
   ];
   if (registry) args.push("--registry", registry);
 
@@ -59,25 +87,26 @@ names.forEach(function (name) {
   // Thất bại giả ở đây là thất bại đắt nhất của pipeline: số phiên bản bị đốt và phải
   // tăng số cho cả 7 gói. Chờ thêm vài phút rẻ hơn nhiều. Ngược lại, KHÔNG được bỏ hẳn
   // việc kiểm để cho nhanh: đây là cửa duy nhất nhìn thấy thứ kho gói thật sự trả về.
-  const MAX_WAIT_MS = 10 * 60 * 1000;
   const started = Date.now();
-  const deadline = started + MAX_WAIT_MS;
   let packed;
   for (let attempt = 1; ; attempt++) {
     packed = spawnSync("npm", args, { encoding: "utf8", shell: false, cwd: tmp });
     if (packed.status === 0) break;
 
-    // Chỉ "chưa thấy gói" mới đáng chờ. E403, sai tên, mất DNS là lỗi vĩnh viễn —
-    // chờ chúng 10 phút mỗi gói là bắt cả pipeline treo một tiếng rồi mới báo một
-    // chuyện đã biết ngay từ lần thử đầu.
-    if (!/404|E404/.test(String(packed.stderr))) break;
-    if (Date.now() >= deadline) break;
+    // Chỉ dừng sớm khi ĐỌC ĐƯỢC một lỗi rõ ràng không phải "chưa có gói" — E403,
+    // ENEEDAUTH, sai tên. Lỗi không đọc được thì vẫn phải chờ: mặc định của một cửa
+    // an toàn là kiên nhẫn, không phải bỏ cuộc. Lần trước làm ngược lại và mất một
+    // số phiên bản, vì `--silent` khiến mọi lỗi đều trông như lỗi trống.
+    const why = String(packed.stderr || "");
+    if (PERMANENT.test(why)) break;
+    if (Date.now() >= DEADLINE) break;
 
     const backoff = Math.min(15, attempt * 2);
     if (attempt === 1 || attempt % 5 === 0) {
       const elapsed = Math.round((Date.now() - started) / 1000);
+      const left = Math.max(0, Math.round((DEADLINE - Date.now()) / 1000));
       process.stdout.write(
-        "  " + name + ": kho gói chưa trả về, đã chờ " + elapsed + "s (tối đa 600s)\n"
+        "  " + name + ": kho gói chưa trả về, đã chờ " + elapsed + "s (còn " + left + "s)\n"
       );
     }
     spawnSync("sleep", [String(backoff)], { shell: false });

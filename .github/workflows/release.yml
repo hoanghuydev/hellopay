@@ -155,7 +155,7 @@ jobs:
       # Bước 4 — CỬA QUAN TRỌNG NHẤT. Tải LẠI 6 gói TỪ KHO GÓI (không lấy từ dist/ trên
       # máy), băm lại binary bên trong, so với bảng trong gói bọc CHƯA publish.
       - name: tải lại từ kho gói và so mã băm
-        run: node npm/verify-published.js
+        run: node npm/verify-published.js --max-wait 600
 
       # Bước 5 — cài thử ĐÚNG file gói bọc sắp publish, trong một project sạch, với 6
       # gói nền tảng lấy từ kho gói thật. Chạy TRƯỚC khi publish gói bọc, nên hỏng ở
