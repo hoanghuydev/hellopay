@@ -19,7 +19,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: "1.26"
+          # Ghim đủ ba số. "1.26" thả trôi số cuối, và runner bốc được bản nào thì
+          # dùng bản đó: hai lần phát hành cách nhau 15 phút đã ra go1.26.8 rồi
+          # go1.26.7, nên cùng một tag cho ra hai binary khác nhau. Điều đó phá đúng
+          # câu "để CI build, để mọi bản phát hành đều tái tạo được" ở §9.
+          # Nâng số này là một quyết định có chủ ý, không phải việc để mặc.
+          go-version: "1.26.8"
 
       - name: gofmt
         run: |
@@ -50,7 +55,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.8" # xem comment ở lần khai đầu tiên
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "~> v2"
@@ -106,7 +111,7 @@ jobs:
           fetch-depth: 0 # goreleaser cần tag để suy ra số phiên bản
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.8" # xem comment ở lần khai đầu tiên
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"

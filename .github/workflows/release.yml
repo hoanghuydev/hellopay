@@ -28,7 +28,12 @@ jobs:
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: "1.26"
+          # Ghim đủ ba số. "1.26" thả trôi số cuối, và runner bốc được bản nào thì
+          # dùng bản đó: hai lần phát hành cách nhau 15 phút đã ra go1.26.8 rồi
+          # go1.26.7, nên cùng một tag cho ra hai binary khác nhau. Điều đó phá đúng
+          # câu "để CI build, để mọi bản phát hành đều tái tạo được" ở §9.
+          # Nâng số này là một quyết định có chủ ý, không phải việc để mặc.
+          go-version: "1.26.8"
           # Job phát hành không được nhận lại dữ liệu tạm mà một branch khác đã ghi:
           # nếu bộ nhớ tạm bị đầu độc thì checksums.txt và chữ ký cosign sẽ chứng thực
           # rất trung thực một binary đã hỏng. Đổi 1-2 phút lấy một chuỗi tin cậy sạch.
