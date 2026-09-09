@@ -146,11 +146,16 @@ function main() {
   try {
     pkgDir = path.dirname(require.resolve(platformPkg + "/package.json"));
   } catch (e) {
+    // Hai nguyên nhân, không phải một. Thông báo chỉ nêu nguyên nhân thứ nhất sẽ đẩy
+    // người dùng đi cài lại mãi không xong khi thật ra gói không có trên kho gói —
+    // đúng chuyện đã xảy ra với chính bản 0.1.3 của lab.
     fail(
       "the hellopay binary for " + process.platform + "/" + process.arch + " is not installed.",
-      "Expected package: " + platformPkg,
-      "This happens when optional dependencies are skipped (npm install --no-optional",
-      "or --omit=optional). Reinstall with optional dependencies enabled."
+      "Expected package: " + platformPkg + "@" + pkg.version,
+      "Usually optional dependencies were skipped (npm install --no-optional or",
+      "--omit=optional). Reinstall with them enabled.",
+      "If they were not skipped, that package is not on the registry. Check with:",
+      "  npm view " + platformPkg + "@" + pkg.version
     );
   }
 
