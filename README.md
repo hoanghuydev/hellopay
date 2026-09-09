@@ -32,11 +32,11 @@ scoop bucket add hoanghuydev https://github.com/hoanghuydev/scoop-bucket
 scoop install hellopay
 ```
 
-npm — **chưa publish**, lệnh dưới đây sẽ chạy được sau khi kênh này lên:
+npm:
 
 ```bash
-npx hellopay@0.1.3 version
-npm install --save-dev hellopay@0.1.3
+npx hellopay@0.1.6 version
+npm install --save-dev hellopay@0.1.6
 ```
 
 Luôn ghi rõ số phiên bản. `@latest` và `npx hellopay` để trống sẽ lấy bất kỳ bản nào đang là mới
