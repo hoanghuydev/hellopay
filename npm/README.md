@@ -5,7 +5,7 @@ A fake CLI for practising releases. Not a real product.
 ## Install
 
 ```sh
-npm install --save-dev hellopay@0.1.2
+npm install --save-dev hellopay@0.1.3
 npx hellopay version
 ```
 

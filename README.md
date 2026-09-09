@@ -35,8 +35,8 @@ scoop install hellopay
 npm — **chưa publish**, lệnh dưới đây sẽ chạy được sau khi kênh này lên:
 
 ```bash
-npx hellopay@0.1.2 version
-npm install --save-dev hellopay@0.1.2
+npx hellopay@0.1.3 version
+npm install --save-dev hellopay@0.1.3
 ```
 
 Luôn ghi rõ số phiên bản. `@latest` và `npx hellopay` để trống sẽ lấy bất kỳ bản nào đang là mới

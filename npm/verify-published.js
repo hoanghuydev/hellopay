@@ -60,18 +60,24 @@ names.forEach(function (name) {
   // tăng số cho cả 7 gói. Chờ thêm vài phút rẻ hơn nhiều. Ngược lại, KHÔNG được bỏ hẳn
   // việc kiểm để cho nhanh: đây là cửa duy nhất nhìn thấy thứ kho gói thật sự trả về.
   const MAX_WAIT_MS = 10 * 60 * 1000;
-  const deadline = Date.now() + MAX_WAIT_MS;
+  const started = Date.now();
+  const deadline = started + MAX_WAIT_MS;
   let packed;
-  let waited = 0;
   for (let attempt = 1; ; attempt++) {
     packed = spawnSync("npm", args, { encoding: "utf8", shell: false, cwd: tmp });
     if (packed.status === 0) break;
+
+    // Chỉ "chưa thấy gói" mới đáng chờ. E403, sai tên, mất DNS là lỗi vĩnh viễn —
+    // chờ chúng 10 phút mỗi gói là bắt cả pipeline treo một tiếng rồi mới báo một
+    // chuyện đã biết ngay từ lần thử đầu.
+    if (!/404|E404/.test(String(packed.stderr))) break;
     if (Date.now() >= deadline) break;
+
     const backoff = Math.min(15, attempt * 2);
-    waited += backoff;
     if (attempt === 1 || attempt % 5 === 0) {
+      const elapsed = Math.round((Date.now() - started) / 1000);
       process.stdout.write(
-        "  " + name + ": chưa đọc được từ kho gói, đã chờ " + waited + "s (tối đa 600s)\n"
+        "  " + name + ": kho gói chưa trả về, đã chờ " + elapsed + "s (tối đa 600s)\n"
       );
     }
     spawnSync("sleep", [String(backoff)], { shell: false });

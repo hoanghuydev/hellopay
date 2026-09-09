@@ -114,8 +114,13 @@ Object.keys(optional).forEach(function (name) {
 // binary trong gói đúng là binary của bản đó, không phải bản cũ còn sót trong dist/.
 const nativeKey = process.platform + "-" + process.arch;
 if (EXPECTED.indexOf(nativeKey) !== -1) {
-  const nativeBin = path.join(out, "cli-" + nativeKey, "bin", CLI);
-  if (fs.existsSync(nativeBin)) {
+  const nativeBinName = nativeKey.indexOf("win32") === 0 ? CLI + ".exe" : CLI;
+  const nativeBin = path.join(out, "cli-" + nativeKey, "bin", nativeBinName);
+  // Thiếu file thì phải KÊU. Bỏ qua im lặng biến bước kiểm chéo bắt buộc này thành
+  // một bước luôn xanh trên đúng những máy nó chưa từng chạy.
+  if (!fs.existsSync(nativeBin)) {
+    problems.push("cannot cross-check the version: " + nativeBin + " is missing");
+  } else {
     const r = spawnSync(nativeBin, ["version", "--json"], { encoding: "utf8", shell: false });
     if (r.status !== 0) {
       problems.push("could not run the " + nativeKey + " binary: " + String(r.stderr).trim());

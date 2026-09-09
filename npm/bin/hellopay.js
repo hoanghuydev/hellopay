@@ -97,10 +97,13 @@ function alreadyVerified(binPath, expected) {
   }
 }
 
-function rememberVerified(binPath, expected) {
+// `st` PHẢI là trạng thái file đọc TRƯỚC khi băm, không phải đọc lại ở đây. Đọc lại
+// sau khi băm là ghi cặp (trạng thái MỚI, mã băm CŨ): ai tráo file trong khoảng giữa
+// hai thao tác đó sẽ được đệm cấp cho một giấy chứng nhận vĩnh viễn, và mọi lần chạy
+// sau đều bỏ qua việc băm. Một cuộc đua chớp nhoáng biến thành một lỗ hổng thường trực.
+function rememberVerified(binPath, expected, st) {
   if (process.platform === "win32") return;
   try {
-    const st = fs.statSync(binPath);
     if (!ownedByUs(st)) return;
     const file = cacheFile();
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -186,6 +189,22 @@ function main() {
     );
   }
 
+  // Gói nền tảng còn sót lại từ bản trước là chuyện cài đặt bình thường, không phải
+  // dấu hiệu bị tấn công. Không bắt ở đây thì nó rơi xuống bước so mã băm và người
+  // dùng nhận đúng câu "do not run the binary" — đọc như một sự cố an ninh.
+  try {
+    const platformVersion = require(path.join(realDir, "package.json")).version;
+    if (platformVersion !== pkg.version) {
+      fail(
+        "the installed " + platformPkg + " is version " + platformVersion + ", not " + pkg.version + ".",
+        "This happens when a previous version is left behind by an upgrade.",
+        "Remove node_modules and the lockfile entry, then reinstall."
+      );
+    }
+  } catch (e) {
+    // đọc không được thì để bước so mã băm bên dưới xử lý
+  }
+
   // Không có bảng mã băm thì DỪNG, không phải chạy tạm. Một gói bọc dựng thiếu bảng
   // này là một gói bọc không kiểm được gì — nó phải hỏng to, không được hỏng lặng.
   const table = (pkg.hellopay && pkg.hellopay.binaryHashes) || {};
@@ -199,6 +218,12 @@ function main() {
   }
 
   if (!alreadyVerified(binPath, expected)) {
+    let stBefore = null;
+    try {
+      stBefore = fs.statSync(binPath);
+    } catch (e) {
+      stBefore = null; // không đọc được thì thôi, chỉ mất phần đệm
+    }
     const actual = sha256(binPath);
     if (actual !== expected) {
       fail(
@@ -208,7 +233,7 @@ function main() {
         "Reinstall the package. If this persists, do not run the binary."
       );
     }
-    rememberVerified(binPath, expected);
+    if (stBefore) rememberVerified(binPath, expected, stBefore);
   }
 
   const env = Object.assign({}, process.env);
